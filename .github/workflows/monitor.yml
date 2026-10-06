@@ -1,0 +1,43 @@
+name: Monitor de Noticias
+
+on:
+  schedule:
+    - cron: "7,27,47 * * * *"   # horario em UTC
+  workflow_dispatch:     # permite rodar manualmente pela aba Actions
+
+concurrency:
+  group: monitor-noticias
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # necessario para salvar o enviados.json
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Criar config.json a partir do secret
+        env:
+          CONFIG_JSON: ${{ secrets.CONFIG_JSON }}
+        run: printf '%s' "$CONFIG_JSON" > config.json
+
+      - name: Fazer uma verificacao
+        run: python servidor.py --uma-vez
+
+      - name: Salvar historico (enviados.json)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add enviados.json || true
+          git diff --cached --quiet || (git commit -m "atualiza historico" && git push)
